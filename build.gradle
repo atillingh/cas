@@ -1,5 +1,6 @@
 import org.apereo.cas.gradle.CasBuildSettings
 import org.apereo.cas.gradle.CasProjectConventions
+import org.apereo.cas.gradle.PublishProjectModulesMetadataTask
 import org.gradle.api.attributes.Bundling
 import org.gradle.api.attributes.Category
 import org.gradle.api.attributes.DocsType
@@ -55,6 +56,7 @@ ext {
     skipBootifulArtifact = providers.systemProperty("skipBootifulArtifact").present
     skipErrorProneCompiler = providers.systemProperty("skipErrorProneCompiler").present
     skipSpringBootDevTools = providers.systemProperty("skipSpringBootDevTools").present
+    publishingType = providers.systemProperty("publishingType").getOrElse("AUTOMATIC")
 
     skipArtifactSigning = providers.systemProperty("skipArtifactSigning").present
     terminateCompilerOnWarning = providers.systemProperty("terminateCompilerOnWarning").getOrElse("true") == "true"
@@ -78,11 +80,12 @@ apply plugin: "org.apereo.cas.overrides-conventions"
 if (publishReleases || publishSnapshots) {
     apply plugin: "com.gradleup.nmcp.aggregation"
     nmcpAggregation {
+        // publishAllChecksums.set(true)
         centralPortal {
             username = "${repositoryUsername}"
             password = "${repositoryPassword}"
             publicationName = "Apereo CAS Release ${project.version}"
-            publishingType = "AUTOMATIC"
+            publishingType = "${publishingType}"
             validationTimeout.set(Duration.ZERO)
             publishingTimeout.set(Duration.ZERO)
             uploadSnapshotsParallelism.set(4)
@@ -129,9 +132,10 @@ if (!providers.systemProperty("skipSonarqube").present && sonarqubeRequested) {
     }
 }
 
-if (CasBuildSettings.isJavadocRequested(gradle, project)) {
+if (CasBuildSettings.isJavadocRequested(gradle, project) || CasBuildSettings.isPublishReleases(project)) {
     def aggregateJavadocProjectPaths = CasBuildSettings.includedProjectPaths(project)
         .findAll { projectPath -> projectPath != project.path && CasBuildSettings.isJavadocEnabled(project, projectPath) }
+        .findAll { projectPath -> projectPath != ':support:cas-server-support-bom' }
 
     def aggregateJavadocSources = configurations.create('aggregateJavadocSources') {
         canBeConsumed = false
@@ -150,6 +154,7 @@ if (CasBuildSettings.isJavadocRequested(gradle, project)) {
         canBeConsumed = false
         canBeResolved = true
         visible = false
+        extendsFrom(configurations.compileOnly, configurations.annotationProcessor)
         attributes {
             attribute(Category.CATEGORY_ATTRIBUTE, objects.named(Category, Category.LIBRARY))
             attribute(Bundling.BUNDLING_ATTRIBUTE, objects.named(Bundling, Bundling.EXTERNAL))
@@ -170,15 +175,16 @@ if (CasBuildSettings.isJavadocRequested(gradle, project)) {
             }
         }
     }
-    def aggregateJavadocClasspathFiles = files(providers.provider { aggregateJavadocClasspath.files })
 
     tasks.named('javadoc', Javadoc) {
         dependsOn(aggregateJavadocSources)
-        source(aggregateJavadocSourceTrees)
-        classpath = aggregateJavadocClasspathFiles
+        source = files(aggregateJavadocSourceTrees).asFileTree.matching {
+            exclude '**/package-info.java'
+        }
+        classpath = aggregateJavadocClasspath
         destinationDir = new File(project.layout.buildDirectory.getAsFile().get(), 'javadoc')
         options.addBooleanOption('html5', true)
-        failOnError = providers.systemProperty('ignoreJavadocFailures').present
+        failOnError = CasBuildSettings.isPublishFlag(project) ? false : providers.systemProperty('ignoreJavadocFailures').present
     }
 
     tasks.register('aggregateJavadocsIntoJar', Jar) {
@@ -227,6 +233,7 @@ if (CasBuildSettings.isTaskRequested(project, 'jacocoRootReport')
     || gradle.startParameter.taskNames.any { task -> task.startsWith("jacoco") }) {
     def coveredProjectPaths = CasBuildSettings.includedProjectPaths(project)
         .findAll { projectPath -> projectPath != project.path && !projectPath.startsWith(':docs') }
+        .findAll { projectPath -> projectPath != ':support:cas-server-support-bom' }
 
     def aggregateCoverageData = configurations.create('aggregateCoverageData') {
         canBeConsumed = false
@@ -323,7 +330,9 @@ tasks.register('verifyRequiredJavaVersion') {
     }
 }
 
-if (CasBuildSettings.isTaskRequested(project, 'generateProjectModulesMetadata')) {
+def projectModulesMetadataTaskRequested = CasBuildSettings.isTaskRequested(project, 'generateProjectModulesMetadata') ||
+    CasBuildSettings.isTaskRequested(project, 'publishProjectModulesMetadata')
+if (projectModulesMetadataTaskRequested) {
     def modulesOutputFile = layout.buildDirectory.file('modules.json')
     def projectVersion = version.toString().replaceAll('-SNAPSHOT', '')
     def projectGroup = group.toString()
@@ -352,7 +361,7 @@ if (CasBuildSettings.isTaskRequested(project, 'generateProjectModulesMetadata'))
         }
     def moduleMetadataJson = groovy.json.JsonOutput.toJson(moduleMetadataResults)
 
-    tasks.register('generateProjectModulesMetadata') {
+    def generateProjectModulesMetadata = tasks.register('generateProjectModulesMetadata') {
         outputs.file(modulesOutputFile)
         doLast {
             def output = modulesOutputFile.get().asFile
@@ -360,6 +369,13 @@ if (CasBuildSettings.isTaskRequested(project, 'generateProjectModulesMetadata'))
             output.write moduleMetadataJson
             println "Published project modules to ${output}"
         }
+    }
+
+    tasks.register('publishProjectModulesMetadata', PublishProjectModulesMetadataTask) {
+        dependsOn(generateProjectModulesMetadata)
+        modulesMetadataFile.set(modulesOutputFile)
+        casVersion.set(project.version.toString())
+        mongoImportExecutable.set(providers.systemProperty("casModuleMetadataMongoImportExecutable").orElse("mongoimport"))
     }
 }
 

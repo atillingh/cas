@@ -29,7 +29,7 @@ env:
   TERM: xterm-256color
   JDK_CURRENT: 25
   JDK_DISTRIBUTION: "corretto"
-  NODE_CURRENT: '26.3.0'
+  NODE_CURRENT: '26.5.0'
   MAX_ATTEMPTS: 1
   RETRY_MINUTES: 20
   SCENARIO_REGEX: ${{ github.event.inputs.scenarioRegex || '.*' }}
@@ -58,7 +58,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           persist-credentials: false
       - name: Set up JDK
@@ -83,7 +83,7 @@ jobs:
       scenarios766: ${{ steps.get-scenarios766.outputs.scenarios766 }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           persist-credentials: false
       - name: Set up JDK
@@ -116,7 +116,7 @@ jobs:
     name: ${{matrix.scenario}}
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           persist-credentials: false
       - name: Initialize
@@ -174,7 +174,7 @@ jobs:
     name: ${{matrix.scenario}}
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           persist-credentials: false
       - name: Initialize
@@ -233,7 +233,7 @@ jobs:
     name: ${{matrix.scenario}}
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           persist-credentials: false
       - name: Initialize

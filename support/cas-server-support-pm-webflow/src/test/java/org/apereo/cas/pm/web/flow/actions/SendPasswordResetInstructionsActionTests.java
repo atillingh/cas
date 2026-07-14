@@ -52,14 +52,14 @@ class SendPasswordResetInstructionsActionTests {
             val service = mock(PasswordManagementService.class);
             when(service.createToken(any())).thenReturn(null);
             when(service.findUsername(any())).thenReturn("casuser");
-            when(service.findEmail(any())).thenReturn("casuser@example.org");
+            when(service.findEmails(any())).thenReturn(Set.of("casuser@example.org"));
             return service;
         }
     }
 
     @Nested
     @TestPropertySource(properties = {
-        "cas.authn.attribute-repository.stub.attributes.mail=cas@example.org",
+        "cas.authn.attribute-repository.stub.attributes.mail=cas@example.org,cas2@example.org",
         "cas.authn.attribute-repository.stub.attributes.phone=1234567890",
 
         "cas.authn.pm.reset.mail.attribute-name=mail",

@@ -161,7 +161,7 @@ pupcas <scenario-name>
 To see the list of available test scenarios:
 
 ```bash
-./gradlew --build-cache --configure-on-demand --no-daemon -q puppeteerScenarios
+./ci/tests/puppeteer/run.sh --scenarios
 ```
 
 Remote debugging may be available on port `5000`. To successfully run tests, 
@@ -280,9 +280,11 @@ A basic modest outline of the test configuration may be:
   "exitScript": "${PWD}/ci/tests/puppeteer/scenarios/${SCENARIO}/exit.sh",
   "instances": 2,
   "instance1": {
+    "dependencies": "module4,module5",
     "properties": [ ]
   },
   "instance2": {
+    "dependencies": "module6",
     "properties": [ ]
   },
   "variations": [
@@ -296,6 +298,8 @@ A basic modest outline of the test configuration may be:
 ```
   
 The only required bit in the test JSON configuration might be the `dependencies` attribute.
+When multiple CAS instances are requested, each `instanceN` block may also define `dependencies`.
+Instance dependencies are added to the common root `dependencies` set, and the runner builds a separate CAS artifact for each instance.
 
 ### MacOS Firewall Popup
                       
